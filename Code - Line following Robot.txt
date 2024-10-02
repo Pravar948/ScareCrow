@@ -1,0 +1,144 @@
+#include <Adafruit_PWMServoDriver.h>
+Adafruit_PWMServoDriver board1 = Adafruit_PWMServoDriver(0x40);
+
+//Line Tracking IO define
+#define LT_R digitalRead(A2)
+#define LT_M digitalRead(A1)
+#define LT_L digitalRead(A0)
+
+#define ENA 5
+#define ENB 6
+#define IN1 7
+#define IN2 8
+#define IN3 9
+#define IN4 10
+
+#define carSpeed 80
+
+// Radar sweep variables
+int angle = 0;
+int angleStep = 1;
+unsigned long lastSweepTime = 0;
+const int sweepInterval = 30; // Sweep every 30 ms
+
+
+// Define PWM channel for the radar servo
+#define RADAR_SERVO_CHANNEL 0
+
+void forward(){
+  analogWrite(ENA, carSpeed);
+  analogWrite(ENB, carSpeed);
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH);
+  Serial.println("Go forward!");
+}
+
+void back(){
+  analogWrite(ENA, carSpeed);
+  analogWrite(ENB, carSpeed);
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+  Serial.println("Go back!");
+}
+
+void left(){
+  analogWrite(ENA, carSpeed);
+  analogWrite(ENB, carSpeed);
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+  Serial.println("Go left!");
+}
+
+void right(){
+  analogWrite(ENA, carSpeed);
+  analogWrite(ENB, carSpeed);
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH); 
+  Serial.println("Go right!");  
+} 
+
+void stop(){
+   digitalWrite(ENA, LOW);
+   digitalWrite(ENB, LOW);
+   Serial.println("Stop!");
+}
+
+void sweepRadar() {
+    int pwmValue = angleToPWM(angle);
+    Serial.print("Angle: ");
+    Serial.print(angle);
+    Serial.print(" -> PWM: ");
+    Serial.println(pwmValue);
+
+    // Move the servo connected to the radar
+    board1.setPWM(RADAR_SERVO_CHANNEL, 0, pwmValue);
+
+    // Update angle for the next sweep
+    angle += angleStep;
+    if (angle >= 135 || angle <= 45) {
+        angleStep = -angleStep; // Change direction of sweep
+    }
+}
+
+
+int angleToPWM(int angle) {
+    int pwmValue = map(angle, 0, 180, 150, 600); // Map angle to PWM range
+    return pwmValue;
+}
+
+
+void setup() {
+  //Declaring PIN input types for IR
+  pinMode(LT_R,INPUT);
+  pinMode(LT_M,INPUT);
+  pinMode(LT_L,INPUT);
+
+  board1.begin();
+  board1.setPWMFreq(50);                  // Analog servos run at ~60 Hz updates
+
+  //Begin serial communication
+  Serial.begin(9600);
+}
+
+void loop() {
+
+  //Printing values of the sensors to the serial monitor
+  Serial.println("Left");
+  Serial.println(digitalRead(LT_L));
+  Serial.println("Middle");
+  Serial.println(digitalRead(LT_M));
+  Serial.println("Right");
+  Serial.println(digitalRead(LT_R));
+
+  if(LT_M){
+    forward();
+  }
+  else if(LT_R) { 
+    right();
+    while(LT_R);                             
+  }   
+  else if(LT_L) {
+    left();
+    while(LT_L);  
+  }
+  else{
+    stop();
+  }
+
+  
+  // Radar sweep logic
+  unsigned long currentTime = millis();
+  if (currentTime - lastSweepTime >= sweepInterval) {
+      sweepRadar();
+      lastSweepTime = currentTime;
+  }
+
+}
